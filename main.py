@@ -48,11 +48,11 @@ def daily_search():
     ).text
     cnt_curr, cnt_total = map(int, cnt_txt.split("/"))
     print(f"{cnt_curr}/{cnt_total}")
-    remain = (cnt_total - cnt_curr) // 3
-    remain += 1
+    remain_count = (cnt_total - cnt_curr) // 3
+
     random.shuffle(contents)
     contents = iter(contents)
-    while remain > 0:
+    for i in range(remain_count):
         cnt_txt = driver.find_element(
             By.XPATH,
             '//*[@id="pointsCounters_pcSearchLevel1_0"]',
@@ -72,7 +72,7 @@ def daily_search():
         time.sleep(2)
         try:
             driver.find_element(By.XPATH, '//*[@id="algocore"]/div[3]').click()
-            time.sleep(random.randint(5, 25))
+            time.sleep(random.randint(5, 15))
             driver.close()
         except:
             pass
@@ -82,24 +82,39 @@ def daily_search():
         driver.close()
         driver.switch_to.window(driver.window_handles[0])
         # driver.find_element(By.XPATH, '//input[@id="sb_form_go"]').click()
-        remain -= 1
+
+    driver.get("https://rewards.bing.com/redeem/pointsbreakdown")
+    cnt_txt = driver.find_element(
+        By.XPATH,
+        '//*[@id="userPointsBreakdown"]/div/div[2]/div/div/div/div[2]/mee-rewards-user-points-details/div/div/div/div/p[2]',
+    ).text
+    cnt_curr, cnt_total = map(int, cnt_txt.split("/"))
+    print(f"{cnt_curr}/{cnt_total}")
+    remain_count = (cnt_total - cnt_curr) // 3
+
+    return remain_count
 
 
-def earn():
+def daily_sets():
     driver.get("https://rewards.bing.com/")
-    daily_set = driver.find_element(
+    for card in driver.find_elements(
         By.XPATH,
-        '//*[@id="daily-sets"]/mee-card-group[1]/div',
-    )
-    for job in daily_set.find_elements(
-        By.XPATH,
-        "//card-content",
+        '//*[@id="daily-sets"]//card-content',
     )[:3]:
-        job.click()
-        time.sleep(1)
+        if "mee-icon-SkypeCircleCheck" in card.find_element(
+            By.XPATH,
+            "./mee-rewards-daily-set-item-content/div/a/mee-rewards-points/div/div/span[1]",
+        ).get_attribute("class"):
+            print("Already done")
+            continue
+        card.click()
+        time.sleep(4)
+        driver.close()
 
-    time.sleep(5)
+    time.sleep(2)
 
 
-daily_search()
-earn()
+daily_sets()
+remian = daily_search()
+if remian > 0:
+    raise RuntimeError("Wait before next run, please!")
