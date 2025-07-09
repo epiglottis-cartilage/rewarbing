@@ -1,29 +1,32 @@
-import selenium
-from selenium import webdriver, common
-import selenium.webdriver
+from selenium import webdriver
 from selenium.webdriver.common.by import By
 import os
 import time
 import random
 
 driver: webdriver.Edge = None
+rate_limit = 5
+proxy: str | None = "http://127.0.0.1:7890"
 
 
 def lunch_browser(mobile: bool):
     global driver
     if driver is not None:
         driver.quit()
-    options = selenium.webdriver.EdgeOptions()
+    options = webdriver.EdgeOptions()
     edge_profile_path = os.path.join(
         os.environ["USERPROFILE"], "AppData", "Local", "Microsoft", "Edge", "User Data"
     )
     options.add_argument(f"user-data-dir={edge_profile_path}")
+    options.add_argument("log-level=3")
+    if proxy:
+        options.add_argument(f"proxy-server={proxy}")
     if mobile:
         options.add_argument(
-            'user-agent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.2 Mobile/15E148 Safari/604.1"'
+            'user-agent="Mozilla/5.0 (Linux; Android 13; PGIM10 Build/TP1A.220905.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.6778.135 Mobile Safari/537.36 BingWeb/6.9.8"'
         )
     driver = webdriver.Edge(options=options)
-    driver.implicitly_wait(10)
+    driver.implicitly_wait(8)
 
 
 def get_contents():
@@ -53,6 +56,7 @@ def get_contents():
 
 
 def daily_search(mobile: bool):
+    global rate_limit
     contents = get_contents()
 
     driver.get("https://rewards.bing.com/pointsbreakdown")
@@ -63,7 +67,8 @@ def daily_search(mobile: bool):
     cnt_curr, cnt_total = map(int, cnt_txt.split("/"))
     print(f"{cnt_curr}/{cnt_total}")
     remain_count = (cnt_total - cnt_curr) // 3
-    remain_count = min(remain_count, 5)
+    remain_count = min(remain_count, rate_limit)
+    rate_limit -= remain_count
     driver.find_element(By.XPATH, '//*[@id="modal-host"]/div[2]/button').click()
 
     for i in range(remain_count):
@@ -126,11 +131,26 @@ def daily_sets():
     time.sleep(2)
 
 
-remian = 0
-lunch_browser(False)
-daily_sets()
-remian = daily_search(False)
-lunch_browser(True)
-remian += daily_search(True)
-if remian > 0:
-    raise RuntimeError("Wait before next run, please!")
+def check_running():
+    # if edge is running before our script, then we should not run the script
+    for proc in os.popen("tasklist").read().splitlines():
+        if "msedge.exe" in proc:
+            return True
+    return False
+
+
+def main():
+    if check_running():
+        raise RuntimeError("Edge is running, please close it completely!")
+    remian = 0
+    lunch_browser(False)
+    daily_sets()
+    remian = daily_search(False)
+    lunch_browser(True)
+    remian += daily_search(True)
+    if remian > 0:
+        raise RuntimeError("Wait before next run, please!")
+
+
+if __name__ == "__main__":
+    main()
