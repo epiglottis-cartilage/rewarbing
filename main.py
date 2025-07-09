@@ -55,7 +55,7 @@ def get_contents():
 def daily_search(mobile: bool):
     contents = get_contents()
 
-    driver.get("https://rewards.bing.com/redeem/pointsbreakdown")
+    driver.get("https://rewards.bing.com/pointsbreakdown")
     cnt_txt = driver.find_elements(
         By.XPATH,
         '//*[@class="title-detail"]/p[2]',
@@ -64,38 +64,35 @@ def daily_search(mobile: bool):
     print(f"{cnt_curr}/{cnt_total}")
     remain_count = (cnt_total - cnt_curr) // 3
     remain_count = min(remain_count, 5)
+    driver.find_element(By.XPATH, '//*[@id="modal-host"]/div[2]/button').click()
 
-    driver.get(
-        "https://www.bing.com/news/?form=ml11z9&crea=ml11z9&wt.mc_id=ml11z9&rnoreward=1&rnoreward=1"
-    )
     for i in range(remain_count):
-        word = next(contents) + "\n"
+        word = next(contents)
         bar = driver.find_element(
             By.ID,
-            "sb_form_q",
+            "rewards-suggestedSearch-searchbox",
         )
         bar.click()
         bar.clear()
         for c in word:
             bar.send_keys(c)
             time.sleep(random.randint(5, 15) / 100)
+        driver.find_element(
+            By.XPATH,
+            '//*[@id="rewards-suggestedSearch-searchbox-form"]/div/div',
+        ).click()
         # simulate mouse scroll down
         # for i in range(100):
         #     driver.execute_script(f"window.scrollTo(0, {10 * i});")
         # for i in range(100, 0, -1):
         #     driver.execute_script(f"window.scrollTo(0, {-10 * i});")
         time.sleep(1)
-
-        try:
-            if mobile:
-                driver.find_element(By.XPATH, '//div[@id="coreresults"]/div[2]').click()
-            else:
-                driver.find_element(By.XPATH, '//*[@id="algocore"]/div[2]').click()
-            time.sleep(random.randint(3, 10))
-            driver.switch_to.window(driver.window_handles[-1])
+        driver.switch_to.window(driver.window_handles[-1])
+        driver.find_element(By.XPATH, '//*[@id="b_results"]/li[3]').click()
+        time.sleep(random.randint(3, 10))
+        for handle in driver.window_handles[1:]:
+            driver.switch_to.window(handle)
             driver.close()
-        except:
-            pass
         driver.switch_to.window(driver.window_handles[0])
 
     driver.get("https://rewards.bing.com/redeem/pointsbreakdown")
@@ -130,11 +127,10 @@ def daily_sets():
 
 
 remian = 0
-# lunch_browser(False)
-# daily_sets()
-# remian = daily_search(0)
+lunch_browser(False)
+daily_sets()
+remian = daily_search(False)
 lunch_browser(True)
-input()
-# remian += daily_search(1)
+remian += daily_search(True)
 if remian > 0:
     raise RuntimeError("Wait before next run, please!")
