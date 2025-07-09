@@ -6,61 +6,76 @@ import os
 import time
 import random
 
-options = selenium.webdriver.EdgeOptions()
-edge_profile_path = os.path.join(
-    os.environ["USERPROFILE"], "AppData", "Local", "Microsoft", "Edge", "User Data"
-)
-options.add_argument(f"user-data-dir={edge_profile_path}")
-driver = webdriver.Edge(options=options)
-driver.implicitly_wait(10)
+driver: webdriver.Edge = None
 
 
-def daily_search():
-    def get_contents():
-        driver.get(
-            f"https://www.google.com/search?q=news&tbm=nws&start={random.randint(0, 200)}"
+def lunch_browser(mobile: bool):
+    global driver
+    if driver is not None:
+        driver.quit()
+    options = selenium.webdriver.EdgeOptions()
+    edge_profile_path = os.path.join(
+        os.environ["USERPROFILE"], "AppData", "Local", "Microsoft", "Edge", "User Data"
+    )
+    options.add_argument(f"user-data-dir={edge_profile_path}")
+    if mobile:
+        options.add_argument(
+            'user-agent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.2 Mobile/15E148 Safari/604.1"'
         )
-        titles = filter(
-            lambda x: x,
-            map(
-                lambda r: r.text.strip().lower(),
-                driver.find_elements(By.XPATH, '//div[@role="heading"]'),
-            ),
-        )
+    driver = webdriver.Edge(options=options)
+    driver.implicitly_wait(10)
 
-        def title_subseq(title: str):
-            words = title.replace("'", "").split()
-            # radom pick words
-            words = random.sample(words, int(len(words) / 1.5))
-            return " ".join(words)
 
-        titles = map(title_subseq, titles)
+def get_contents():
+    driver.get(
+        f"https://www.google.com/search?q=news&tbm=nws&start={random.randint(0, 200)}"
+    )
+    titles = filter(
+        lambda x: x,
+        map(
+            lambda r: r.text.strip().lower(),
+            driver.find_elements(By.XPATH, '//div[@role="heading"]'),
+        ),
+    )
 
-        return list(titles)
+    def title_subseq(title: str):
+        words = title.replace("'", "").split()
+        # radom pick words
+        words = random.sample(words, int(len(words) / 1.8))
+        return " ".join(words)
 
+    print("Titles found:", titles)
+
+    titles = list(map(title_subseq, titles))
+    random.shuffle(titles)
+
+    return iter(titles)
+
+
+def daily_search(mobile: bool):
     contents = get_contents()
-    print(contents)
 
     driver.get("https://rewards.bing.com/redeem/pointsbreakdown")
-    cnt_txt = driver.find_element(
+    cnt_txt = driver.find_elements(
         By.XPATH,
-        '//*[@id="userPointsBreakdown"]/div/div[2]/div/div/div/div[2]/mee-rewards-user-points-details/div/div/div/div/p[2]',
-    ).text
+        '//*[@class="title-detail"]/p[2]',
+    )[1 if mobile else 0].text
     cnt_curr, cnt_total = map(int, cnt_txt.split("/"))
     print(f"{cnt_curr}/{cnt_total}")
     remain_count = (cnt_total - cnt_curr) // 3
+    remain_count = min(remain_count, 5)
 
-    random.shuffle(contents)
-    contents = iter(contents)
+    driver.get(
+        "https://www.bing.com/news/?form=ml11z9&crea=ml11z9&wt.mc_id=ml11z9&rnoreward=1&rnoreward=1"
+    )
     for i in range(remain_count):
-        cnt_txt = driver.find_element(
-            By.XPATH,
-            '//*[@id="pointsCounters_pcSearchLevel1_0"]',
-        ).click()
-        driver.switch_to.window(driver.window_handles[-1])
         word = next(contents) + "\n"
-        bar = driver.find_element(By.ID, "sb_form_q")
+        bar = driver.find_element(
+            By.ID,
+            "sb_form_q",
+        )
         bar.click()
+        bar.clear()
         for c in word:
             bar.send_keys(c)
             time.sleep(random.randint(5, 15) / 100)
@@ -69,25 +84,25 @@ def daily_search():
         #     driver.execute_script(f"window.scrollTo(0, {10 * i});")
         # for i in range(100, 0, -1):
         #     driver.execute_script(f"window.scrollTo(0, {-10 * i});")
-        time.sleep(2)
+        time.sleep(1)
+
         try:
-            driver.find_element(By.XPATH, '//*[@id="algocore"]/div[3]').click()
-            time.sleep(random.randint(5, 15))
+            if mobile:
+                driver.find_element(By.XPATH, '//div[@id="coreresults"]/div[2]').click()
+            else:
+                driver.find_element(By.XPATH, '//*[@id="algocore"]/div[2]').click()
+            time.sleep(random.randint(3, 10))
+            driver.switch_to.window(driver.window_handles[-1])
             driver.close()
         except:
             pass
-        driver.switch_to.window(driver.window_handles[-1])
-
-        # close the last page
-        driver.close()
         driver.switch_to.window(driver.window_handles[0])
-        # driver.find_element(By.XPATH, '//input[@id="sb_form_go"]').click()
 
     driver.get("https://rewards.bing.com/redeem/pointsbreakdown")
-    cnt_txt = driver.find_element(
+    cnt_txt = driver.find_elements(
         By.XPATH,
-        '//*[@id="userPointsBreakdown"]/div/div[2]/div/div/div/div[2]/mee-rewards-user-points-details/div/div/div/div/p[2]',
-    ).text
+        '//*[@class="title-detail"]/p[2]',
+    )[1 if mobile else 0].text
     cnt_curr, cnt_total = map(int, cnt_txt.split("/"))
     print(f"{cnt_curr}/{cnt_total}")
     remain_count = (cnt_total - cnt_curr) // 3
@@ -109,12 +124,17 @@ def daily_sets():
             continue
         card.click()
         time.sleep(4)
-        driver.close()
+        driver.switch_to.window(driver.window_handles[0])
 
     time.sleep(2)
 
 
-daily_sets()
-remian = daily_search()
+remian = 0
+# lunch_browser(False)
+# daily_sets()
+# remian = daily_search(0)
+lunch_browser(True)
+input()
+# remian += daily_search(1)
 if remian > 0:
     raise RuntimeError("Wait before next run, please!")
