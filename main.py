@@ -5,7 +5,8 @@ import time
 import random
 
 driver: webdriver.Edge = None
-rate_limit = 5
+headless = False
+rate_limit = 4
 proxy: str | None = "http://127.0.0.1:7890"
 
 
@@ -13,12 +14,16 @@ def lunch_browser(mobile: bool):
     global driver
     if driver is not None:
         driver.quit()
+    os.system("taskkill /f /im msedge.exe")
     options = webdriver.EdgeOptions()
     edge_profile_path = os.path.join(
         os.environ["USERPROFILE"], "AppData", "Local", "Microsoft", "Edge", "User Data"
     )
     options.add_argument(f"user-data-dir={edge_profile_path}")
     options.add_argument("log-level=3")
+    if headless:
+        options.add_argument("headless=new")
+    options.add_argument("disable-audio-output")
     if proxy:
         options.add_argument(f"proxy-server={proxy}")
     if mobile:
@@ -30,6 +35,9 @@ def lunch_browser(mobile: bool):
 
 
 def get_contents():
+    # new table
+    driver.execute_script("window.open('');")
+    driver.switch_to.window(driver.window_handles[-1])
     driver.get(
         f"https://www.google.com/search?q=news&tbm=nws&start={random.randint(0, 200)}"
     )
@@ -42,32 +50,39 @@ def get_contents():
     )
 
     def title_subseq(title: str):
-        words = title.replace("'", "").split()
+        words = ("".join(filter(lambda c: c not in ",\"'.", title))).split()
         # radom pick words
-        words = random.sample(words, int(len(words) / 1.8))
+        words = random.sample(words, int(len(words) / 2))
         return " ".join(words)
 
-    print("Titles found:", titles)
-
     titles = list(map(title_subseq, titles))
+    print("titles:", titles)
     random.shuffle(titles)
-
+    driver.switch_to.window(driver.window_handles[0])
     return iter(titles)
 
 
 def daily_search(mobile: bool):
     global rate_limit
-    contents = get_contents()
 
     driver.get("https://rewards.bing.com/pointsbreakdown")
     cnt_txt = driver.find_elements(
         By.XPATH,
         '//*[@class="title-detail"]/p[2]',
     )[1 if mobile else 0].text
-    cnt_curr, cnt_total = map(int, cnt_txt.split("/"))
-    print(f"{cnt_curr}/{cnt_total}")
-    remain_count = (cnt_total - cnt_curr) // 3
-    remain_count = min(remain_count, rate_limit)
+    try:
+        cnt_curr, cnt_total = map(int, cnt_txt.split("/"))
+        print(f"current point: {cnt_curr}/{cnt_total}")
+        remain_count = (cnt_total - cnt_curr) // 3
+        if remain_count == 0:
+            return 0
+    except ValueError:
+        print("Failed to parse current points from:", cnt_txt)
+        remain_count = 3
+
+    contents = get_contents()
+
+    remain_count = max(1, min(remain_count, rate_limit))
     rate_limit -= remain_count
     driver.find_element(By.XPATH, '//*[@id="modal-host"]/div[2]/button').click()
 
@@ -93,23 +108,30 @@ def daily_search(mobile: bool):
         #     driver.execute_script(f"window.scrollTo(0, {-10 * i});")
         time.sleep(1)
         driver.switch_to.window(driver.window_handles[-1])
-        driver.find_element(By.XPATH, '//*[@id="b_results"]/li[3]').click()
-        time.sleep(random.randint(3, 10))
+        time.sleep(random.randint(2, 3))
+        # driver.find_element(By.XPATH, '//*[@id="b_results"]/li[3]').click()
+        # time.sleep(random.randint(1, 4))
         for handle in driver.window_handles[1:]:
             driver.switch_to.window(handle)
             driver.close()
         driver.switch_to.window(driver.window_handles[0])
+        print("Search completed:", word)
 
     driver.get("https://rewards.bing.com/redeem/pointsbreakdown")
     cnt_txt = driver.find_elements(
         By.XPATH,
         '//*[@class="title-detail"]/p[2]',
     )[1 if mobile else 0].text
-    cnt_curr, cnt_total = map(int, cnt_txt.split("/"))
-    print(f"{cnt_curr}/{cnt_total}")
-    remain_count = (cnt_total - cnt_curr) // 3
 
-    return remain_count
+    try:
+        cnt_curr, cnt_total = map(int, cnt_txt.split("/"))
+        print(f"current point: {cnt_curr}/{cnt_total}")
+        remain_count = (cnt_total - cnt_curr) // 3
+
+        return remain_count
+    except ValueError:
+        print("Failed to parse current points from:", cnt_txt)
+        return 1
 
 
 def daily_sets():
@@ -140,17 +162,32 @@ def check_running():
 
 
 def main():
-    if check_running():
-        raise RuntimeError("Edge is running, please close it completely!")
+    # if check_running():
+    #     raise RuntimeError("Edge is running, please close it completely!")
+    print("Starting Bing Rewards script...")
     remian = 0
     lunch_browser(False)
     daily_sets()
     remian = daily_search(False)
     lunch_browser(True)
     remian += daily_search(True)
-    if remian > 0:
-        raise RuntimeError("Wait before next run, please!")
+    # if remian > 0:
+    #     raise RuntimeError("Wait before next run, please!")
+    driver.quit()
+    return remian
 
 
 if __name__ == "__main__":
-    main()
+    remain = 1
+    while remain > 0:
+        remain = main()
+        try:
+            remain = main()
+        except Exception as e:
+            print(e)
+        print("Waiting for next run...")
+        for i in range(15):
+            print(f"{i}..", end="", flush=True)
+            time.sleep(60)
+        print()
+        rate_limit = 4
