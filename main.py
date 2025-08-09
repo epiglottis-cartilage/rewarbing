@@ -180,7 +180,6 @@ def main():
 if __name__ == "__main__":
     remain = 1
     while remain > 0:
-        remain = main()
         try:
             remain = main()
         except Exception as e:
