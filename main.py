@@ -5,7 +5,7 @@ import time
 import glob
 import random
 
-driver: webdriver.Edge = None
+driver: webdriver.Edge | webdriver.Firefox = None
 headless = False
 rate_limit = 4
 proxy: str | None = "http://127.0.0.1:7890"
@@ -39,14 +39,8 @@ def launch_browser_firefox(mobile: bool):
     global driver
     if driver is not None:
         driver.quit()
-
-    # 关闭所有Firefox进程
     os.system("taskkill /f /im firefox.exe")
-
-    # 配置Firefox选项
     options = webdriver.FirefoxOptions()
-
-    # 获取Firefox默认配置文件路径
     firefox_profiles_dir = os.path.join(
         os.environ["USERPROFILE"],
         "AppData",
@@ -55,35 +49,20 @@ def launch_browser_firefox(mobile: bool):
         "Firefox",
         "Profiles",
     )
-
-    # 查找最新的默认配置文件
     if os.path.exists(firefox_profiles_dir):
         profile_dirs = glob.glob(os.path.join(firefox_profiles_dir, "*.default*"))
         if profile_dirs:
-            # 选择第一个找到的默认配置文件
             default_profile = profile_dirs[0]
             options.add_argument(f"--profile={default_profile}")
-
-    # 日志级别设置
     options.set_preference("webdriver.log.file", "geckodriver.log")
-
-    # 无头模式
     if headless:
         options.add_argument("-headless")
-
-    # 禁用音频输出
     options.set_preference("media.volume_scale", "0.0")
-
-    # 代理设置
     if proxy:
         options.add_argument(f"--proxy-server={proxy}")
-
-    # 移动设备用户代理
     if mobile:
         user_agent = "Mozilla/5.0 (Linux; Android 13; PGIM10 Build/TP1A.220905.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.6778.135 Mobile Safari/537.36 BingWeb/6.9.8"
         options.set_preference("general.useragent.override", user_agent)
-
-    # 初始化Firefox驱动
     driver = webdriver.Firefox(options=options)
     driver.implicitly_wait(8)
 
@@ -197,10 +176,12 @@ def daily_sets():
         By.XPATH,
         '//*[@id="daily-sets"]//card-content',
     )[:3]:
-        if "mee-icon-SkypeCircleCheck" in card.find_element(
-            By.XPATH,
-            "./mee-rewards-daily-set-item-content/div/a/mee-rewards-points/div/div/span[1]",
-        ).get_attribute("class"):
+        if (
+            marker := card.find_element(
+                By.XPATH,
+                "./mee-rewards-daily-set-item-content/div/a/mee-rewards-points/div/div/span[1]",
+            ).get_attribute("class")
+        ) is not None and "done" in marker:
             print("Already done")
             continue
         card.click()
