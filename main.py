@@ -2,7 +2,6 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 import os
 import time
-import glob
 import random
 
 driver: webdriver.Edge | webdriver.Firefox = None
@@ -35,39 +34,7 @@ def launch_browser_edge(mobile: bool):
     driver.implicitly_wait(8)
 
 
-def launch_browser_firefox(mobile: bool):
-    global driver
-    if driver is not None:
-        driver.quit()
-    os.system("taskkill /f /im firefox.exe")
-    options = webdriver.FirefoxOptions()
-    firefox_profiles_dir = os.path.join(
-        os.environ["USERPROFILE"],
-        "AppData",
-        "Roaming",
-        "Mozilla",
-        "Firefox",
-        "Profiles",
-    )
-    if os.path.exists(firefox_profiles_dir):
-        profile_dirs = glob.glob(os.path.join(firefox_profiles_dir, "*.default*"))
-        if profile_dirs:
-            default_profile = profile_dirs[0]
-            options.add_argument(f"--profile={default_profile}")
-    options.set_preference("webdriver.log.file", "geckodriver.log")
-    if headless:
-        options.add_argument("-headless")
-    options.set_preference("media.volume_scale", "0.0")
-    if proxy:
-        options.add_argument(f"--proxy-server={proxy}")
-    if mobile:
-        user_agent = "Mozilla/5.0 (Linux; Android 13; PGIM10 Build/TP1A.220905.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.6778.135 Mobile Safari/537.36 BingWeb/6.9.8"
-        options.set_preference("general.useragent.override", user_agent)
-    driver = webdriver.Firefox(options=options)
-    driver.implicitly_wait(8)
-
-
-launch_browser = launch_browser_firefox
+launch_browser = launch_browser_edge
 
 
 def get_contents():
@@ -181,7 +148,7 @@ def daily_sets():
                 By.XPATH,
                 "./mee-rewards-daily-set-item-content/div/a/mee-rewards-points/div/div/span[1]",
             ).get_attribute("class")
-        ) is not None and "done" in marker:
+        ) is None or "mee-icon-SkypeCircleCheck" in marker:
             print("Already done")
             continue
         card.click()
