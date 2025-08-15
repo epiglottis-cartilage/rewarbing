@@ -6,8 +6,10 @@ import random
 
 driver: webdriver.Edge | webdriver.Firefox = None
 headless = False
+RATE_LIMIT = 4
 rate_limit = 4
 proxy: str | None = "http://127.0.0.1:7890"
+point_per_search = 5
 
 
 def launch_browser_edge(mobile: bool):
@@ -76,7 +78,7 @@ def daily_search(mobile: bool):
     try:
         cnt_curr, cnt_total = map(int, cnt_txt.split("/"))
         print(f"current point: {cnt_curr}/{cnt_total}")
-        remain_count = (cnt_total - cnt_curr) // 3
+        remain_count = (cnt_total - cnt_curr) // point_per_search
         if remain_count == 0:
             return 0
     except ValueError:
@@ -170,16 +172,16 @@ def main():
     # if check_running():
     #     raise RuntimeError("Edge is running, please close it completely!")
     print("Starting Bing Rewards script...")
-    remian = 0
+    remain = 0
     launch_browser(False)
     daily_sets()
-    remian = daily_search(False)
+    remain = daily_search(False)
     launch_browser(True)
-    remian += daily_search(True)
-    # if remian > 0:
+    remain += daily_search(True)
+    # if remain > 0:
     #     raise RuntimeError("Wait before next run, please!")
     driver.quit()
-    return remian
+    return remain
 
 
 if __name__ == "__main__":
@@ -194,4 +196,4 @@ if __name__ == "__main__":
             print(f"{i}..", end="", flush=True)
             time.sleep(60)
         print()
-        rate_limit = 4
+        rate_limit = RATE_LIMIT
